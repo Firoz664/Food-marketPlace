@@ -8,11 +8,20 @@ import (
 )
 
 func UserRoutes(router *gin.Engine) {
-	userGroup := router.Group("/api/v1/user")
+	userGroup := router.Group("/api/v1/users")
 	{
-		userGroup.GET("/getAllUsers", userController.GetUser())
+
+		userGroup.POST("/signup", userController.Signup())
+		userGroup.POST("/login", userController.Login())
+
+		userGroup.GET("/getAllUsers", userController.GetAllUser())
 		userGroup.GET("/getUserDetails", AuthController.Authentication(), userController.GetUserDetails())
-		userGroup.GET("/updateUserDetails", userController.UpdateUserDetails())
+		userGroup.PUT("/updateUserDetails", AuthController.Authentication(), userController.UpdateUserDetails())
+
+		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword())
+		userGroup.POST("/forgetPassword", userController.ForgetPassword())
+
+		userGroup.POST("/deleteAccount", AuthController.Authentication(), userController.DeleteAccount())
 
 	}
 }

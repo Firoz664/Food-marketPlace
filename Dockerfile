@@ -1,28 +1,28 @@
-FROM golang:1.22 as builder
+# Use the official Golang image to create a build artifact.
+FROM golang:latest as builder
 
+# Set the Current Working Directory inside the container
 WORKDIR /app
 
-# Copy go mod and sum files
-COPY go.mod go.sum ./
-# Download all dependencies. Dependencies will be cached if the go.mod and go.sum files are not changed
-RUN go mod download
-
-# Copy the source code into the container
+# Copy everything from the current directory to the PWD (Present Working Directory) inside the container
 COPY . .
 
-# Build the Go app
-RUN CGO_ENABLED=0 GOOS=linux go build -v -o main .
+# Compile the Go app for Linux (in case you're building on a non-linux system)
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o main .
 
-# Start a new stage from scratch
-FROM debian:buster-slim
+# Use a Docker multi-stage build to create a lean production image.
+FROM alpine:latest  
+
+# Add CA Certificates
+RUN apk --no-cache add ca-certificates
 
 WORKDIR /root/
 
-# Copy the Pre-built binary file from the previous stage
+# Copy the Pre-built binary file from the previous stage.
 COPY --from=builder /app/main .
 
-# Expose port 3007 to the outside world
-EXPOSE 3007
+# Expose port 9001 to the outside world
+EXPOSE 9000
 
 # Command to run the executable
 CMD ["./main"]

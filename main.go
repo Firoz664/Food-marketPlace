@@ -57,7 +57,7 @@ func main() {
 
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "3007"
+		port = "9000"
 	}
 
 	// Health check
@@ -66,11 +66,22 @@ func main() {
 			"message": "pong",
 		})
 	})
+
+	router.LoadHTMLGlob("template/*")
+
+	// Serve the HTML file at the default route
 	router.GET("/", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "Server running successfully",
+		// Assuming you have an index.html inside the templates directory
+		c.HTML(200, "index.html", gin.H{
+			"title": "Home Page",
 		})
 	})
+
+	// router.GET("/", func(c *gin.Context) {
+	// 	c.JSON(http.StatusOK, gin.H{
+	// 		"message": "Server running successfully",
+	// 	})
+	// })
 	// Catch-all route for any request not matched by the above routes
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"status": 404, "message": "Not found❗️🤷‍♂️ 404  Check the URL of the page."})
