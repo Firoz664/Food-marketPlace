@@ -17,6 +17,7 @@ import (
 
 // logger
 var foodCollection *mongo.Collection = database.OpenCollection(database.Client, "food")
+var userCollection *mongo.Collection = database.OpenCollection(database.Client, "user")
 
 func main() {
 	// Initialize Zap logger
@@ -77,11 +78,6 @@ func main() {
 		})
 	})
 
-	// router.GET("/", func(c *gin.Context) {
-	// 	c.JSON(http.StatusOK, gin.H{
-	// 		"message": "Server running successfully",
-	// 	})
-	// })
 	// Catch-all route for any request not matched by the above routes
 	router.NoRoute(func(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"status": 404, "message": "Not found❗️🤷‍♂️ 404  Check the URL of the page."})

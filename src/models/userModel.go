@@ -19,8 +19,8 @@ type User struct {
 	RefreshToken *string            `json:"refreshToken"`
 	CreatedAt    time.Time          `json:"createdAt"`
 	UpdatedAt    time.Time          `json:"updatedAt"`
-	UserId       string             `json:"userId"`
-	IsVerify     bool               `json:"IsVerify"`
+	UserID       string             `json:"userId"`
+	IsVerify     bool               `json:"isVerify"`
 	IsComplete   bool               `json:"isComplete"`
-	LastActive   time.Time          `json:"userId"`
+	LastActive   time.Time          `json:"lastActive"`
 }
