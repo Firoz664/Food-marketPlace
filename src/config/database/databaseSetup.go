@@ -11,7 +11,7 @@ import (
 )
 
 // var MONGODB_URL = "mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/golang-ecomm"
-var MONGODB_URL = ("mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/golang-ecomm")
+var MONGODB_URL = ("mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/")
 
 // DBInstance creates and returns a new MongoDB client instance.
 func DBInstance() *mongo.Client {
