@@ -5,95 +5,214 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
+	tokenGenerate "github.com/foodmngtapp/food-management-apps/src/common/helpers/tokenHandler"
 	"github.com/foodmngtapp/food-management-apps/src/config/database"
 	"github.com/foodmngtapp/food-management-apps/src/models"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"golang.org/x/crypto/bcrypt"
 )
 
 var userCollection *mongo.Collection = database.OpenCollection(database.Client, "user")
 var validate = validator.New()
 
-// Dummy user struct for demonstration purposes
+// Helper Fucntions
+func HashPassword(password string) string {
+	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
+	if err != nil {
+		log.Panic(err)
+	}
+	return string(bytes)
+}
+func VerifyPassword(userPassword string, givenPassword string) (bool, string) {
+	err := bcrypt.CompareHashAndPassword([]byte(givenPassword), []byte(userPassword))
+	checkValidPassword := true
+	msg := ""
+
+	if err != nil {
+		msg = fmt.Sprintf("Invalid login credentials!")
+		checkValidPassword = false
+	}
+	return checkValidPassword, msg
+}
 
 func Signup() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		var mongoCtx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
 		var user models.User
-		fmt.Println("User", user)
+
 		if err := c.BindJSON(&user); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      err.Error(),
+			})
 			return
 		}
 
-		// Assume validate is a valid validator instance of github.com/go-playground/validator/v10
+		// validate date type and key
 		validationErr := validate.Struct(user)
 		if validationErr != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": validationErr.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      validationErr.Error(),
+			})
 			return
 		}
 
-		count, err := userCollection.CountDocuments(ctx, bson.M{"email": user.Email})
+		var result bson.M
+		err := userCollection.FindOne(mongoCtx, bson.M{
+			"$or": []bson.M{
+				{"email": user.Email},
+				{"mobilenumber": user.MobileNumber},
+			},
+		}).Decode(&result)
+
 		if err != nil {
-			log.Printf("Error occurred while checking for the email: %v", err)
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error occurred while checking for the email"})
+			if err == mongo.ErrNoDocuments {
+				// No user found with the same email or mobile, safe to proceed with user registration
+			} else {
+				// An error occurred during the query execution
+				log.Println(err)
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"status":     false,
+					"statusCode": http.StatusInternalServerError,
+					"error":      "internal server error",
+				})
+				return
+			}
+		} else {
+			// A user was found with the same email or mobile
+			c.JSON(http.StatusConflict, gin.H{
+				"status":     false,
+				"statusCode": http.StatusConflict,
+				"error":      "User already exits! with email or mobile",
+			})
 			return
 		}
 
-		if count > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "this email already exists"})
+		userID := primitive.NewObjectID()
+		// Assuming HashPassword and generate.TokenGenerator are implemented elsewhere and working correctly.
+		password := HashPassword(*user.Password)
+		user.Password = &password
+		user.CreatedAt = time.Now() // Direct assignment, no need for parsing
+		user.UpdatedAt = time.Now()
+		user.LastActive = time.Now()
+		user.ID = userID // Assuming ID is of type primitive.ObjectID
+		user.UserID = userID.Hex()
+		user.ID = primitive.NewObjectID()
+		fmt.Println("password:", password)
+		*user.Email = strings.ToLower(*user.Email)
+
+		// // Handling errors from TokenGenerator
+		token, refreshToken, err := tokenGenerate.GenerateAllTokens(*user.Email, *user.FirstName, *user.LastName, user.UserID)
+		if err != nil {
+			log.Println(err) // Use log or c.JSON to return an error response
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Error generating tokens",
+			})
 			return
 		}
 
-		// Insert the user into the database, omitted for brevity
+		user.Token = &token
+		user.RefreshToken = &refreshToken
+		_, insertErr := userCollection.InsertOne(c, user)
+		if insertErr != nil {
+			log.Println(insertErr) // It's a good practice to log the actual error too
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status": "false",
+				"error":  "Getting error while creating user, please try again"})
+			return
+		}
+		defer cancel()
 
+		userData := user
+		userData.Password = nil
+		// Respond with user details, message, and custom status code
 		c.JSON(http.StatusOK, gin.H{
-			"status":  http.StatusOK,
-			"message": "User signed up successfully",
+			"data": gin.H{
+				"status":  http.StatusOK,
+				"message": "User signup successfully",
+				"result":  userData,
+			},
 		})
+
 	}
 }
 
 func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Simulate fetching a user
-		var _, cancel = context.WithTimeout(context.Background(), 100*time.Second)
+		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
 		var user models.User
 		fmt.Println("User", user)
 		if err := c.BindJSON(&user); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "false",
-				"error":  err.Error(),
-			})
-			return
-		}
-		if user.Email == nil || *user.Email == "" || user.Password == nil || *user.Password == "" {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"status": "false",
-				"error":  "Email or Password missing",
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      err.Error(),
 			})
 			return
 		}
 
-		// Assume validate is a valid validator instance of github.com/go-playground/validator/v10
+		if user.Email == nil || *user.Email == "" || user.Password == nil || *user.Password == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "Email or Password missing",
+			})
+			return
+		}
+
+		*user.Email = strings.ToLower(*user.Email)
+		var foundUser models.User
+		err := userCollection.FindOne(ctx, bson.M{"email": user.Email}).Decode(&foundUser)
+		if err != nil {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":     false,
+				"statusCode": http.StatusNotFound,
+				"error":      "User not exist!"})
+			return
+		}
+		checkValidPassword, msg := VerifyPassword(*user.Password, *foundUser.Password)
+		if !checkValidPassword {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status": false,
+				"error":  msg})
+			return
+		}
+
+		token, refreshToken, err := tokenGenerate.GenerateAllTokens(*foundUser.Email, *foundUser.FirstName, *foundUser.LastName, foundUser.UserID)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+			return
+		}
+
+		tokenGenerate.UpdateAllTokens(token, refreshToken, foundUser.UserID)
+
+		userResponse := foundUser
+		userResponse.Password = nil
 
 		// Log fetching user operation
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
-				"status":  http.StatusOK,
-				"message": "User login successfully",
-				"result": gin.H{
-					"name":  "Shams Firoz",
-					"email": "email@test.com",
-				},
+				"status":     true,
+				"statusCode": http.StatusOK,
+				"message":    "User login successfully",
+				"result":     userResponse,
 			},
 		})
 
@@ -113,16 +232,51 @@ func GetAllUser() gin.HandlerFunc {
 	}
 }
 
-func GetUserDetails() gin.HandlerFunc {
+func GetUserDetails(userCollection *mongo.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Simulate fetching a user
+		// Retrieve userID from query parameters
+		userID := c.Query("userId") // Ensure this query parameter name matches what's sent by the client
+		if userID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "user ID not found in query parameters"})
+			return
+		}
 
-		// Log fetching user operation
+		var userDetail models.User                                                                  // Assuming models.User is your user model
+		err := userCollection.FindOne(context.TODO(), bson.M{"userid": userID}).Decode(&userDetail) // Make sure the field name matches your MongoDB document
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
+			} else {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "error fetching user details"})
+			}
+			return
+		}
+		update := bson.M{
+			"$set": bson.M{
+				"lastactive": time.Now(),
+			},
+		}
 
-		// Return the dummy user object along with status code and message
+		// Perform the update operation
+		filter := bson.M{"userId": userID}
+		result, err := userCollection.UpdateOne(context.TODO(), filter, update)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "error updating user lastActive"})
+			return
+		}
+
+		// Assuming you want to exclude certain sensitive details from the response
+		// If Password is a string, you should set it to an empty string instead of nil
+		userDetail.Password = nil // Adjust according to your model's field type
+
 		c.JSON(http.StatusOK, gin.H{
-			"status":  http.StatusOK,
-			"message": "User fetched successfully",
+			"data": gin.H{
+				"status":     true,
+				"statusCode": http.StatusOK,
+				"message":    "User fetch successfully",
+				"result":     userDetail,
+				"updated":    result,
+			},
 		})
 	}
 }

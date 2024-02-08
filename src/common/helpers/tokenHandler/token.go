@@ -21,6 +21,7 @@ type SignedTokendDetails struct {
 	LastName  string
 	UserID    string
 	Uid       string
+	ID        string
 	jwt.StandardClaims
 }
 
@@ -98,7 +99,7 @@ func UpdateAllTokens(signedToken string, signedRefreshToken string, userId strin
 	updateObj = append(updateObj, bson.E{Key: "updatedAt", Value: UpdatedAt})
 
 	upsert := true
-	filter := bson.M{"userId": userId}
+	filter := bson.M{"userid": userId}
 	fmt.Println("filter", filter) //print filter apply
 	opt := options.UpdateOptions{
 		Upsert: &upsert,
