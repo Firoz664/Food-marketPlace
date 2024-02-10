@@ -22,9 +22,9 @@ func UserRoutes(router *gin.Engine) {
 
 		userGroup.GET("/getAllUsers", userController.GetAllUser())
 		userGroup.GET("/getUserDetails", AuthController.Authentication(), userController.GetUserDetails(userCollection))
-		userGroup.PUT("/updateUserDetails", AuthController.Authentication(), userController.UpdateUserDetails())
+		userGroup.PUT("/updateUserDetails", AuthController.Authentication(), userController.UpdateUserDetails(userCollection))
 
-		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword())
+		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword(userCollection))
 		userGroup.POST("/forgetPassword", userController.ForgetPassword())
 
 		userGroup.POST("/deleteAccount", AuthController.Authentication(), userController.DeleteAccount())
