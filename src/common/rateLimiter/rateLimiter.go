@@ -1,39 +1,31 @@
 package ratelimiter
 
 import (
-	"time"
+	"encoding/json"
+	"net/http"
 
-	"github.com/gin-contrib/limiter"
-	"github.com/gin-gonic/gin"
+	"golang.org/x/time/rate"
 )
 
-// Initialize the rate limiter
-var rateLimiter *limiter.Limiter
-
-func init() {
-	rateLimiter = NewRateLimiter()
+type Message struct {
+	Status string `json:"status"`
+	Body   string `json:"body"`
 }
 
-func NewRateLimiter() *limiter.Limiter {
-	// Create a new rate limiter with a rate limit of 10 requests per minute
-	rate := limiter.NewRateLimiter(limiter.IPKey, &limiter.Rate{
-		Max:    10,
-		Window: time.Minute,
-	})
+func RateLimiterMiddlewarer(next func(w http.ResponseWriter, r *http.Request)) http.Handler {
+	limiter := rate.NewLimiter(2, 4)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !limiter.Allow() {
+			message := Message{
+				Status: "Request Failed",
+				Body:   "The API is at capacity, try again later.",
+			}
 
-	return rate
-}
-
-func RateLimiterMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		// Apply the rate limiter middleware to the current request
-		if err := rateLimiter.Limit(c.Writer, c.Request); err != nil {
-			// Return a 429 Too Many Requests error if the rate limit is exceeded
-			c.AbortWithStatus(429)
+			w.WriteHeader(http.StatusTooManyRequests)
+			json.NewEncoder(w).Encode(&message)
 			return
+		} else {
+			next(w, r)
 		}
-
-		// Continue processing the request if the rate limit is not exceeded
-		c.Next()
-	}
+	})
 }

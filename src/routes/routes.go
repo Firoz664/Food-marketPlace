@@ -16,6 +16,7 @@ func RegisterRoutes(router *gin.Engine) {
 	OrderRoutes(router)
 	OtpRoutes(router)
 	PaymentRoutes(router)
+	RestaruntRoutes(router)
 	RiderRoutes(router)
 	TableRoutes(router)
 	TransactionRoutes(router)
