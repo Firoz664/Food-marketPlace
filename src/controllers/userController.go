@@ -160,8 +160,9 @@ func Signup() gin.HandlerFunc {
 			log.Println(insertErr) // It's a good practice to log the actual error too
 			logger.Log.Error("Getting error while creating user", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"status": "false",
-				"error":  "Getting error while creating user, please try again"})
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Getting error while creating user, please try again"})
 			return
 		}
 		defer cancel()
@@ -182,17 +183,10 @@ func Signup() gin.HandlerFunc {
 
 func Login() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Simulate fetching a user
 		var ctx, cancel = context.WithTimeout(context.Background(), 100*time.Second)
 		defer cancel()
 
-		var updates Credential
-		if err := c.BindJSON(&updates); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid request body"})
-			return
-		}
 		var user models.User
-		fmt.Println("User", user)
 		if err := c.BindJSON(&user); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":     false,
@@ -202,7 +196,7 @@ func Login() gin.HandlerFunc {
 			return
 		}
 
-		if user.Email == nil || *user.Email == "" || user.Password == nil || *user.Password == "" {
+		if user.Email == nil || user.Password == nil {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":     false,
 				"statusCode": http.StatusBadRequest,
@@ -218,20 +212,27 @@ func Login() gin.HandlerFunc {
 			c.JSON(http.StatusNotFound, gin.H{
 				"status":     false,
 				"statusCode": http.StatusNotFound,
-				"error":      "User not exist!"})
+				"error":      "User not exist!",
+			})
 			return
 		}
+
 		checkValidPassword, msg := VerifyPassword(*user.Password, *foundUser.Password)
 		if !checkValidPassword {
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status": false,
-				"error":  msg})
+				"error":  msg,
+			})
 			return
 		}
 
 		token, refreshToken, err := tokenGenerate.GenerateAllTokens(*foundUser.Email, *foundUser.FirstName, *foundUser.LastName, foundUser.UserID)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to generate tokens"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Failed to generate tokens",
+			})
 			return
 		}
 
@@ -249,7 +250,6 @@ func Login() gin.HandlerFunc {
 				"result":     userResponse,
 			},
 		})
-
 	}
 }
 
@@ -258,13 +258,19 @@ func GetAllUser() gin.HandlerFunc {
 		// Parse query parameters for pagination and search
 		page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 		if err != nil || page < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid page number"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "Invalid page number"})
 			return
 		}
 
 		limit, err := strconv.Atoi(c.DefaultQuery("limit", "10"))
 		if err != nil || limit < 1 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid limit"})
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "Invalid limit"})
 			return
 		}
 
@@ -284,7 +290,10 @@ func GetAllUser() gin.HandlerFunc {
 		// Count total number of documents (users)
 		total, err := userCollection.CountDocuments(context.Background(), filter)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to count users"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Failed to count users"})
 			return
 		}
 
@@ -294,14 +303,21 @@ func GetAllUser() gin.HandlerFunc {
 		// Fetch users with pagination and search filters applied
 		cur, err := userCollection.Find(context.Background(), filter, options.Find().SetLimit(int64(limit)).SetSkip(int64(skip)))
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to fetch users"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Failed to fetch users"})
 			return
 		}
 		defer cur.Close(context.Background())
 
 		var users []models.User
 		if err := cur.All(context.Background(), &users); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode users"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "Failed to decode users",
+			})
 			return
 		}
 
@@ -341,8 +357,8 @@ func GetUserDetails(userCollection *mongo.Collection) gin.HandlerFunc {
 			return
 		}
 
-		var userDetail models.User                                                                     // Assuming models.User is your user model
-		err := userCollection.FindOne(context.TODO(), bson.M{"userid": userIDStr}).Decode(&userDetail) // Make sure the field name matches your MongoDB document
+		var userDetail models.User
+		err := userCollection.FindOne(context.TODO(), bson.M{"userid": userIDStr}).Decode(&userDetail)
 		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				c.JSON(http.StatusNotFound, gin.H{"error": "user not found"})
@@ -365,11 +381,7 @@ func GetUserDetails(userCollection *mongo.Collection) gin.HandlerFunc {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "error updating user lastActive"})
 			return
 		}
-
-		// Assuming you want to exclude certain sensitive details from the response
-		// If Password is a string, you should set it to an empty string instead of nil
-		userDetail.Password = nil // Adjust according to your model's field type
-
+		userDetail.Password = nil
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
 				"status":     true,
@@ -390,34 +402,72 @@ func UpdateUserDetails(userCollection *mongo.Collection) gin.HandlerFunc {
 			return
 		}
 
-		var updates UserUpdates
-		if err := c.BindJSON(&updates); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid request body"})
+		var userDetail models.User // Assuming models.User is your user model
+		err := userCollection.FindOne(context.TODO(), bson.M{"userId": userID}).Decode(&userDetail)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "User not found!"})
 			return
 		}
 
-		// Convert UserUpdates struct to a bson.M for MongoDB update, omitting zero values
-		updateDoc := bson.M{}
-		if !updates.LastActive.IsZero() {
-			updateDoc["lastactive"] = updates.LastActive
+		var updates UserUpdates
+		if err := c.BindJSON(&updates); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "invalid request body",
+			})
+			return
 		}
 
-		if len(updateDoc) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "no valid fields to update"})
+		updateDoc := bson.M{"$set": bson.M{}}
+
+		// Set firstName if provided
+		if updates.FirstName != "" {
+			updateDoc["$set"].(bson.M)["firstname"] = updates.FirstName
+		}
+
+		// Set lastName if provided
+		if updates.LastName != "" {
+			updateDoc["$set"].(bson.M)["lastname"] = updates.LastName
+		}
+
+		// Set lastActive if provided
+		if !updates.LastActive.IsZero() {
+			updateDoc["$set"].(bson.M)["lastactive"] = time.Now()
+		}
+
+		// Set new field to true
+		updateDoc["$set"].(bson.M)["new"] = true
+
+		if len(updateDoc["$set"].(bson.M)) == 0 {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     false,
+				"statusCode": http.StatusBadRequest,
+				"error":      "no valid fields to update",
+			})
 			return
 		}
 
 		filter := bson.M{"userid": userID}
-		update := bson.M{"$set": updateDoc}
-		result, err := userCollection.UpdateOne(context.TODO(), filter, update)
+		result, err := userCollection.UpdateOne(context.TODO(), filter, updateDoc)
 		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "error updating user details"})
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "error updating user details",
+			})
 			return
 		}
-		fmt.Println("result,", result)
 
 		if result.ModifiedCount == 0 {
-			c.JSON(http.StatusOK, gin.H{"message": "no changes made to the user"})
+			c.JSON(http.StatusOK, gin.H{
+				"status":     true,
+				"statusCode": http.StatusOK,
+				"message":    "no changes made to the user",
+			})
 			return
 		}
 
@@ -428,6 +478,7 @@ func UpdateUserDetails(userCollection *mongo.Collection) gin.HandlerFunc {
 		})
 	}
 }
+
 func ResetPassword(userCollection *mongo.Collection) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Get request parameters
@@ -487,56 +538,83 @@ func ResetPassword(userCollection *mongo.Collection) gin.HandlerFunc {
 
 func ForgetPassword() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// Get user input (e.g., email or username) from the request
+		// Get user input (email or mobile number) from the request
 		var req struct {
-			Email string `json:"email" binding:"required,email"`
+			Email        string `json:"email" binding:"omitempty,email"`
+			MobileNumber string `json:"mobileNumber" binding:"omitempty"`
 		}
 		if err := c.BindJSON(&req); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Invalid request data",
+				"status":     true,
+				"statusCode": http.StatusBadRequest,
+				"error":      "Invalid request data",
 			})
 			return
 		}
 
-		// Check if the email exists in the database
+		if req.Email == "" && req.MobileNumber == "" {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"status":     true,
+				"statusCode": http.StatusBadRequest,
+				"error":      "Either email or mobile number must be provided",
+			})
+			return
+		}
+
+		// Find user by email or mobile number
+		filter := bson.M{}
+		if req.Email != "" {
+			filter["email"] = req.Email
+		}
+		if req.MobileNumber != "" {
+			filter["mobilenumber"] = req.MobileNumber
+		}
+
 		var user models.User
-		err := userCollection.FindOne(context.Background(), bson.M{"email": req.Email}).Decode(&user)
+		err := userCollection.FindOne(context.Background(), filter).Decode(&user)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				// User with the provided email does not exist
-				c.JSON(http.StatusNotFound, gin.H{
-					"error": "User not found",
-				})
-				return
-			}
-			// Error occurred while fetching user from the database
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Internal server error",
+			// User with the provided email/mobile does not exist
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":     true,
+				"statusCode": http.StatusNotFound,
+				"error":      "User not found",
 			})
 			return
 		}
 
-		// Generate a secure token for password reset
 		resetToken, err := generateResetToken(user.ID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to generate reset token",
+				"error":      "Failed to generate reset token",
+				"status":     true,
+				"statusCode": http.StatusNotFound,
 			})
 			return
 		}
-
-		// Send password reset email to the user with the reset token
-		err = sendPasswordResetEmail(*user.Email, resetToken)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to send password reset email",
-			})
-			return
+		// Send password reset email or SMS to the user with the reset token
+		if req.Email != "" {
+			err = sendPasswordResetEmail(req.Email, resetToken)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Failed to send password reset email",
+				})
+				return
+			}
+		} else if req.MobileNumber != "" {
+			err = sendPasswordResetSMS(req.MobileNumber, resetToken)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Failed to send password reset SMS",
+				})
+				return
+			}
 		}
 
-		// Password reset email sent successfully
+		// Password reset instructions sent successfully
 		c.JSON(http.StatusOK, gin.H{
-			"message": "Password reset instructions sent to your email",
+			"status":     true,
+			"statusCode": http.StatusOK,
+			"message":    "User changed successfully",
 		})
 	}
 }
@@ -556,57 +634,50 @@ func sendPasswordResetEmail(email string, resetToken string) error {
 	return nil
 }
 
+func sendPasswordResetSMS(email string, resetToken string) error {
+	// Implement your logic to send an email containing the password reset instructions and the reset token
+	// Ensure you securely send the email and handle any errors gracefully
+	return nil
+}
+
 func DeleteAccount() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		var req struct {
-			UserID string `json:"userId" binding:"required"`
-		}
-		if err := c.ShouldBindJSON(&req); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Invalid request data",
-			})
-			return
-		}
-
-		// Convert userID string to ObjectID
-		userObjectID, err := primitive.ObjectIDFromHex(req.UserID)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "Invalid userID format",
-			})
-			return
-		}
-
-		// Check if the user exists
-		var user models.User
-		err = userCollection.FindOne(context.Background(), bson.M{"_id": userObjectID}).Decode(&user)
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				// User with the provided userID does not exist
-				c.JSON(http.StatusNotFound, gin.H{
-					"error": "User not found",
-				})
-				return
-			}
-			// Error occurred while fetching user from the database
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Internal server error",
+		userID := c.Query("userId")
+		if userID == "" {
+			c.JSON(http.StatusUnauthorized, gin.H{
+				"status":     false,
+				"statusCode": http.StatusUnauthorized,
+				"error":      "user ID not found in query parameters",
 			})
 			return
 		}
 
 		// Delete the user account
-		_, err = userCollection.DeleteOne(context.Background(), bson.M{"_id": userObjectID})
+		result, err := userCollection.DeleteOne(context.Background(), bson.M{"userid": userID})
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "Failed to delete user account",
+				"status":     false,
+				"statusCode": http.StatusNotFound,
+				"error":      "Failed to delete user account",
+			})
+			return
+		}
+
+		if result.DeletedCount == 0 {
+			c.JSON(http.StatusNotFound, gin.H{
+				"status":     false,
+				"statusCode": http.StatusNotFound,
+				"error":      "User not found",
 			})
 			return
 		}
 
 		// User account deleted successfully
 		c.JSON(http.StatusOK, gin.H{
-			"message": "User account deleted successfully",
+			"status": true,
+
+			"statusCode": http.StatusOK,
+			"message":    "User Deleted successfully",
 		})
 	}
 }

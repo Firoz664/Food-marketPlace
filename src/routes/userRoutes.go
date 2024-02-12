@@ -2,6 +2,7 @@ package routes
 
 import (
 	AuthController "github.com/foodmngtapp/food-management-apps/src/common/middleware"
+
 	userController "github.com/foodmngtapp/food-management-apps/src/controllers"
 	"go.mongodb.org/mongo-driver/mongo"
 
@@ -27,7 +28,7 @@ func UserRoutes(router *gin.Engine) {
 		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword(userCollection))
 		userGroup.POST("/forgetPassword", userController.ForgetPassword())
 
-		userGroup.POST("/deleteAccount", AuthController.Authentication(), userController.DeleteAccount())
+		userGroup.DELETE("/deleteAccount", AuthController.Authentication(), userController.DeleteAccount())
 
 	}
 }

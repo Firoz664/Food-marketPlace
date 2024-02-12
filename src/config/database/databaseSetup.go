@@ -11,7 +11,7 @@ import (
 )
 
 // var MONGODB_URL = "mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/golang-ecomm"
-var MONGODB_URL = ("mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/")
+var MONGODB_URL = "mongodb+srv://shams:Test123@cluster0.yu3acw9.mongodb.net/"
 
 // DBInstance creates and returns a new MongoDB client instance.
 func DBInstance() *mongo.Client {
@@ -20,7 +20,7 @@ func DBInstance() *mongo.Client {
 		log.Fatalf("Failed to create new MongoDB client: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second) // Reduced timeout to a more practical value
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second) // Reduced timeout to a more practical value
 	defer cancel()
 
 	err = client.Connect(ctx)
