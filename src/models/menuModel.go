@@ -10,9 +10,8 @@ type Menu struct {
 	ID        primitive.ObjectID `bson:"_id"`
 	Name      string             `json:"name" validate:"required"`
 	Category  string             `json:"category" validate:"required"`
-	StartDate *time.Time         `json:"startDate"`
-	EndDate   *time.Time         `json:"endDate"`
-	CreatedAt time.Time          `json:"createdAt"`
-	UpdatedAt time.Time          `json:"updatedAt"`
-	MenuID    string             `json:"menuId"`
+	StartDate *time.Time         `json:"startDate" bson:"startDate"`
+	EndDate   *time.Time         `json:"endDate" bson:"endDate"`
+	CreatedAt time.Time          `json:"createdAt" bson:"createdAt"`
+	UpdatedAt time.Time          `json:"updatedAt" bson:"updatedAt"`
 }
