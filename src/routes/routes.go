@@ -6,6 +6,7 @@ import (
 
 // Register all routes
 func RegisterRoutes(router *gin.Engine) {
+	AdminRoutes(router)
 	FileUploadRoutes(router)
 	FoodRoutes(router)
 	InvoiceRoutes(router)
