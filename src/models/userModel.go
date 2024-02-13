@@ -14,11 +14,12 @@ const (
 	UserType       ProfileType = "USER"
 	RiderType      ProfileType = "RIDER"
 	RestaurantType ProfileType = "RESTAURANT"
+	IsAdminType    ProfileType = "ADMIN"
 )
 
 func ValidateProfileType(profileType ProfileType) error {
 	switch profileType {
-	case UserType, RiderType, RestaurantType:
+	case UserType, RiderType, IsAdminType, RestaurantType:
 		return nil
 	default:
 		return errors.New("invalid profile type")
@@ -43,4 +44,5 @@ type User struct {
 	IsVerify     bool               `json:"isVerify,omitempty" bson:"isVerify,omitempty"`
 	IsComplete   bool               `json:"isComplete,omitempty" bson:"isComplete,omitempty"`
 	LastActive   time.Time          `json:"lastActive,omitempty" bson:"lastActive,omitempty"`
+	Location     Location           `bson:"location" json:"location"`
 }

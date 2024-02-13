@@ -75,6 +75,7 @@ func Signup() gin.HandlerFunc {
 		var user models.User
 
 		if err := c.BindJSON(&user); err != nil {
+			// Handle JSON binding errors
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":     false,
 				"statusCode": http.StatusBadRequest,
@@ -83,11 +84,10 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
-		// validate date type and key
+		// Validate the user input
 		validationErr := validate.Struct(user)
 		if validationErr != nil {
 			logger.Log.Error("Error binding JSON", zap.Error(validationErr))
-
 			c.JSON(http.StatusBadRequest, gin.H{
 				"status":     false,
 				"statusCode": http.StatusBadRequest,
@@ -96,55 +96,51 @@ func Signup() gin.HandlerFunc {
 			return
 		}
 
+		// Normalize email before querying
+		*user.Email = strings.ToLower(*user.Email)
+		// Check if the user already exists
 		var result bson.M
 		err := userCollection.FindOne(mongoCtx, bson.M{
 			"$or": []bson.M{
 				{"email": user.Email},
-				{"mobilenumber": user.MobileNumber},
+				{"mobileNumber": user.MobileNumber},
 			},
 		}).Decode(&result)
 
-		if err != nil {
-			if err == mongo.ErrNoDocuments {
-				// No user found with the same email or mobile, safe to proceed with user registration
-			} else {
-				// An error occurred during the query execution
-				log.Println(err)
-				logger.Log.Error("Mongo error", zap.Error(err))
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"status":     false,
-					"statusCode": http.StatusInternalServerError,
-					"error":      "internal server error",
-				})
-				return
-			}
-		} else {
+		if err == nil {
 			// A user was found with the same email or mobile
 			c.JSON(http.StatusConflict, gin.H{
 				"status":     false,
 				"statusCode": http.StatusConflict,
-				"error":      "User already exits! with email or mobile",
+				"error":      "User already exists with this email or mobile number",
+			})
+			return
+		} else if err != mongo.ErrNoDocuments {
+			// An error occurred during the query execution
+			log.Println(err)
+			logger.Log.Error("Mongo error", zap.Error(err))
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"status":     false,
+				"statusCode": http.StatusInternalServerError,
+				"error":      "internal server error",
 			})
 			return
 		}
 
+		// Proceed with user registration
 		userID := primitive.NewObjectID()
-		// Assuming HashPassword and generate.TokenGenerator are implemented elsewhere and working correctly.
 		password := HashPassword(*user.Password)
 		user.Password = &password
-		user.CreatedAt = time.Now() // Direct assignment, no need for parsing
+		user.CreatedAt = time.Now()
 		user.UpdatedAt = time.Now()
 		user.LastActive = time.Now()
-		user.ID = userID // Assuming ID is of type primitive.ObjectID
+		user.ID = userID
 		user.UserID = userID.Hex()
-		user.ID = primitive.NewObjectID()
-		fmt.Println("password:", password)
-		*user.Email = strings.ToLower(*user.Email)
 
-		// // Handling errors from TokenGenerator
+		// Generate tokens
 		token, refreshToken, err := tokenGenerate.GenerateAllTokens(*user.Email, *user.FirstName, *user.LastName, user.UserID)
 		if err != nil {
-			log.Println(err) // Use log or c.JSON to return an error response
+			log.Println(err)
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":     false,
 				"statusCode": http.StatusInternalServerError,
@@ -155,29 +151,30 @@ func Signup() gin.HandlerFunc {
 
 		user.Token = &token
 		user.RefreshToken = &refreshToken
-		_, insertErr := userCollection.InsertOne(c, user)
+
+		// Insert user into the database
+		_, insertErr := userCollection.InsertOne(mongoCtx, user)
 		if insertErr != nil {
-			log.Println(insertErr) // It's a good practice to log the actual error too
+			log.Println(insertErr)
 			logger.Log.Error("Getting error while creating user", zap.Error(err))
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status":     false,
 				"statusCode": http.StatusInternalServerError,
-				"error":      "Getting error while creating user, please try again"})
+				"error":      "Error creating user, please try again",
+			})
 			return
 		}
-		defer cancel()
 
+		// Respond with user details
 		userData := user
 		userData.Password = nil
-		// Respond with user details, message, and custom status code
 		c.JSON(http.StatusOK, gin.H{
 			"data": gin.H{
 				"status":  http.StatusOK,
-				"message": "User signup successfully",
+				"message": "User signup successful",
 				"result":  userData,
 			},
 		})
-
 	}
 }
 

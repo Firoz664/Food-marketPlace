@@ -2,7 +2,9 @@ package controllers
 
 import (
 	"context"
+	"math"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/foodmngtapp/food-management-apps/src/config/database"
@@ -44,7 +46,7 @@ func CreateRestaurant() gin.HandlerFunc {
 			return
 		}
 
-		if restaurant.Name == "" {
+		if restaurant.RestaurantName == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Restaurant name is required"})
 			return
 		}
@@ -70,7 +72,7 @@ func CreateRestaurant() gin.HandlerFunc {
 func GetRestaurant() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// Parse the restaurant ID from the request parameters
-		restaurantID := c.Query("id")
+		restaurantID := c.Query("restaurantId")
 		if restaurantID == "" {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Restaurant ID is required"})
 			return
@@ -103,12 +105,35 @@ func GetRestaurant() gin.HandlerFunc {
 	}
 }
 
-func GetAllRestarunt() gin.HandlerFunc {
+func GetAllRestaurants() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		cursor, err := restaurantCollection.Find(ctx, bson.M{})
+		// Pagination parameters
+		page, _ := strconv.Atoi(c.DefaultQuery("page", "1"))
+		limit, _ := strconv.Atoi(c.DefaultQuery("limit", "10"))
+		skip := (page - 1) * limit
+
+		// Search parameters
+		search := c.Query("search")
+
+		// MongoDB aggregation pipeline for pagination and search
+		pipeline := make([]bson.M, 0)
+		matchStage := bson.M{"$match": bson.M{"status": "Approve"}}
+		pipeline = append(pipeline, matchStage)
+
+		if search != "" {
+			searchQuery := bson.M{
+				"$or": []bson.M{
+					{"restaurantName": bson.M{"$regex": primitive.Regex{Pattern: search, Options: "i"}}},
+					{"description": bson.M{"$regex": primitive.Regex{Pattern: search, Options: "i"}}},
+				},
+			}
+			pipeline = append(pipeline, bson.M{"$match": searchQuery})
+		}
+
+		cursor, err := restaurantCollection.Aggregate(ctx, pipeline)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to retrieve restaurants"})
 			return
@@ -116,22 +141,39 @@ func GetAllRestarunt() gin.HandlerFunc {
 		defer cursor.Close(ctx)
 
 		var restaurants []models.Restaurant
-		for cursor.Next(ctx) {
-			var restaurant models.Restaurant
-			if err := cursor.Decode(&restaurant); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode restaurant"})
-				return
-			}
-			restaurants = append(restaurants, restaurant)
-		}
-
-		if len(restaurants) == 0 {
-			c.JSON(http.StatusNotFound, gin.H{"error": "No restaurants found"})
+		if err := cursor.All(ctx, &restaurants); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to decode restaurants"})
 			return
 		}
 
-		c.JSON(http.StatusOK, restaurants)
+		// Calculate total count
+		totalCount := len(restaurants)
+		// Apply pagination
+		startIndex := skip
+		endIndex := minHelper(skip+limit, totalCount)
+		paginatedRestaurants := restaurants[startIndex:endIndex]
+
+		// Calculate total pages
+		totalPages := int(math.Ceil(float64(totalCount) / float64(limit)))
+		c.JSON(http.StatusOK, gin.H{
+			"data": gin.H{
+				"status":      true,
+				"statusCode":  http.StatusOK,
+				"message":     "Fetch All Restaurants",
+				"totalPages":  totalPages,
+				"currentPage": page,
+				"totalCount":  totalCount,
+				"result":      paginatedRestaurants,
+			},
+		})
+
 	}
+}
+func minHelper(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
 }
 
 func UpdateRestaurant() gin.HandlerFunc {

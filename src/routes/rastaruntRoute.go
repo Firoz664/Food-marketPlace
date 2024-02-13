@@ -12,11 +12,9 @@ func RestaruntRoutes(router *gin.Engine) {
 
 	{
 
-		userGroup.POST("/addRestarunt", restaruntController.CreateRestaurant())
-		userGroup.POST("/login", restaruntController.Login())
+		userGroup.GET("/getAllRestarunt", restaruntController.GetAllRestaurants())
+		userGroup.GET("/getRestarunt", restaruntController.GetRestaurant())
 
-		userGroup.GET("/getAllRestarunt", restaruntController.GetAllRestarunt())
-		userGroup.GET("/getRestarunt", AuthController.Authentication(), restaruntController.GetRestaurant())
 		userGroup.PUT("/updateRestarunt", AuthController.Authentication(), restaruntController.UpdateRestaurant())
 		userGroup.DELETE("/deleteRestarunt", AuthController.Authentication(), restaruntController.DeleteRestaurant())
 
