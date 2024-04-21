@@ -68,13 +68,12 @@ func main() {
 		})
 	})
 
-	router.LoadHTMLGlob("template/*")
+	// router.LoadHTMLGlob("template/*")
 
 	// Serve the HTML file at the default route
 	router.GET("/", func(c *gin.Context) {
-		// Assuming you have an index.html inside the templates directory
-		c.HTML(200, "index.html", gin.H{
-			"title": "Home Page",
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Server runing on port 9000",
 		})
 	})
 
