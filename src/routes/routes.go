@@ -6,6 +6,7 @@ import (
 
 // Register all routes
 func RegisterRoutes(router *gin.Engine) {
+	// Status routes are registered separately in main.go
 	AdminRoutes(router)
 	FileUploadRoutes(router)
 	FoodRoutes(router)
@@ -22,5 +23,4 @@ func RegisterRoutes(router *gin.Engine) {
 	TableRoutes(router)
 	TransactionRoutes(router)
 	UserRoutes(router)
-
 }

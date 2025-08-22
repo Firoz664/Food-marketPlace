@@ -7,8 +7,9 @@ import (
 	"os"
 	"time"
 
-	"github.com/dgrijalva/jwt-go"
-	"github.com/foodmngtapp/food-management-apps/src/config/database" // Replace with the actual path to your database setup package
+	"github.com/golang-jwt/jwt/v5"
+	"github.com/foodmngtapp/food-management-apps/src/config"
+	"github.com/foodmngtapp/food-management-apps/src/config/database"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,11 +23,39 @@ type SignedTokendDetails struct {
 	UserID    string
 	Uid       string
 	ID        string
-	jwt.StandardClaims
+	jwt.RegisteredClaims
 }
 
-var userCollection *mongo.Collection = database.OpenCollection(database.Client, "user")
-var SECRET_KEY string = os.Getenv("SIGNING_SECRET_KEY")
+var userCollection *mongo.Collection
+
+// getUserCollection returns the user collection with lazy initialization
+func getUserCollection() *mongo.Collection {
+	if userCollection == nil {
+		client := database.DBInstance()
+		userCollection = database.OpenCollection(client, "users")
+	}
+	return userCollection
+}
+
+// GetJWTSecret returns the JWT secret key from config or environment
+func GetJWTSecret() string {
+	// Try to get from config first
+	if config.AppConfig != nil && config.AppConfig.JWT.SecretKey != "" {
+		return config.AppConfig.JWT.SecretKey
+	}
+	
+	// Fallback to environment variable
+	secret := os.Getenv("FOOD_APP_JWT_SECRET_KEY")
+	if secret == "" {
+		secret = os.Getenv("SIGNING_SECRET_KEY") // Legacy support
+	}
+	
+	if secret == "" {
+		log.Fatal("JWT secret key is required. Set FOOD_APP_JWT_SECRET_KEY environment variable or configure it in config file")
+	}
+	
+	return secret
+}
 
 func GenerateAllTokens(email string, firstName string, lastName string, userId string) (signedToken string, signedRefreshToken string, err error) {
 	claims := &SignedTokendDetails{
@@ -35,20 +64,21 @@ func GenerateAllTokens(email string, firstName string, lastName string, userId s
 		LastName:  lastName,
 		UserID:    userId,
 
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(24)).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Local().Add(time.Hour * time.Duration(24))),
 		},
 	}
 	fmt.Println("Claims", claims)
 
 	refreshClaims := &SignedTokendDetails{
-		StandardClaims: jwt.StandardClaims{
-			ExpiresAt: time.Now().Local().Add(time.Hour * time.Duration(168)).Unix(),
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Local().Add(time.Hour * time.Duration(168))),
 		},
 	}
 
-	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(SECRET_KEY))
-	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(SECRET_KEY))
+	secretKey := GetJWTSecret()
+	token, err := jwt.NewWithClaims(jwt.SigningMethodHS256, claims).SignedString([]byte(secretKey))
+	refreshToken, err := jwt.NewWithClaims(jwt.SigningMethodHS256, refreshClaims).SignedString([]byte(secretKey))
 
 	if err != nil {
 		log.Panic(err)
@@ -59,11 +89,12 @@ func GenerateAllTokens(email string, firstName string, lastName string, userId s
 }
 
 func ValidateToken(signedToken string) (claims *SignedTokendDetails, msg string) {
+	secretKey := GetJWTSecret()
 	token, err := jwt.ParseWithClaims(
 		signedToken,
 		&SignedTokendDetails{},
 		func(token *jwt.Token) (interface{}, error) {
-			return []byte(SECRET_KEY), nil
+			return []byte(secretKey), nil
 		},
 	)
 
@@ -79,9 +110,8 @@ func ValidateToken(signedToken string) (claims *SignedTokendDetails, msg string)
 		return
 	}
 
-	if claims.ExpiresAt < time.Now().Local().Unix() {
+	if claims.ExpiresAt.Before(time.Now().Local()) {
 		msg = fmt.Sprintf("token is expired")
-		msg = err.Error()
 		return
 	}
 	return claims, msg
@@ -105,7 +135,8 @@ func UpdateAllTokens(signedToken string, signedRefreshToken string, userId strin
 		Upsert: &upsert,
 	}
 
-	_, err := userCollection.UpdateOne(
+	collection := getUserCollection()
+	_, err := collection.UpdateOne(
 		ctx,
 		filter,
 		bson.D{

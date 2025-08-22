@@ -6,7 +6,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var noteCollection *mongo.Collection = database.OpenCollection(database.Client, "note")
+var noteCollection *mongo.Collection
+
+// getNoteCollection returns the note collection with lazy initialization
+func getNoteCollection() *mongo.Collection {
+	if noteCollection == nil {
+		client := database.DBInstance()
+		noteCollection = database.OpenCollection(client, "note")
+	}
+	return noteCollection
+}
 
 // GetInvoice returns a Gin handler function
 func GetNotes() gin.HandlerFunc {

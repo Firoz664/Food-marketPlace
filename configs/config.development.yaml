@@ -1,0 +1,106 @@
+server:
+  host: "0.0.0.0"
+  port: "9000"
+  readTimeout: "30s"
+  writeTimeout: "30s"
+  idleTimeout: "120s"
+  environment: "development"
+  cors:
+    allowedOrigins:
+      - "http://localhost:3000"
+      - "http://localhost:3001"
+      - "http://127.0.0.1:3000"
+    allowedMethods:
+      - "GET"
+      - "POST"
+      - "PUT"
+      - "PATCH"
+      - "DELETE"
+      - "OPTIONS"
+    allowedHeaders:
+      - "Origin"
+      - "Content-Length"
+      - "Content-Type"
+      - "Authorization"
+      - "X-Requested-With"
+    exposedHeaders:
+      - "Content-Length"
+    allowCredentials: true
+    maxAge: "12h"
+    optionsPassthrough: false
+
+database:
+  uri: "mongodb://localhost:27017"
+  name: "food-marketplace-dev"
+  maxPoolSize: 50
+  minPoolSize: 5
+  maxConnIdleTime: "30m"
+  connectionTimeout: "10s"
+  serverSelectionTimeout: "5s"
+  socketTimeout: "10s"
+  heartbeatInterval: "10s"
+  localThreshold: "15ms"
+
+jwt:
+  secretKey: "${FOOD_APP_JWT_SECRET_KEY}" # Should be set via environment variable
+  accessTokenDuration: "24h"
+  refreshTokenDuration: "168h" # 7 days
+  issuer: "food-marketplace-dev"
+  audience: "food-marketplace-users"
+
+aws:
+  region: "us-west-2"
+  accessKeyId: "${FOOD_APP_AWS_ACCESS_KEY_ID}"
+  secretAccessKey: "${FOOD_APP_AWS_SECRET_ACCESS_KEY}"
+  s3:
+    bucket: "food-marketplace-dev-uploads"
+    region: "us-west-2"
+    presignedUrl: true
+    urlExpiryHours: 24
+  ses:
+    fromEmail: "noreply@foodmarketplace-dev.com"
+    fromName: "Food Marketplace Dev"
+    replyToEmail: "support@foodmarketplace-dev.com"
+
+email:
+  provider: "sendgrid" # sendgrid, ses, smtp
+  sendgrid:
+    apiKey: "${FOOD_APP_SENDGRID_API_KEY}"
+    fromEmail: "noreply@foodmarketplace-dev.com"
+    fromName: "Food Marketplace Dev"
+  smtp:
+    host: "localhost"
+    port: 1025 # MailHog for development
+    username: ""
+    password: ""
+    tls: false
+
+sms:
+  provider: "twilio" # twilio, aws-sns
+  twilio:
+    accountSid: "${FOOD_APP_TWILIO_ACCOUNT_SID}"
+    authToken: "${FOOD_APP_TWILIO_AUTH_TOKEN}"
+    fromNumber: "${FOOD_APP_TWILIO_FROM_NUMBER}"
+  awsSns:
+    region: "us-west-2"
+
+redis:
+  host: "localhost"
+  port: "6379"
+  password: ""
+  db: 0
+  poolSize: 10
+  minIdleConns: 5
+  dialTimeout: "5s"
+  readTimeout: "3s"
+  writeTimeout: "3s"
+  idleTimeout: "5m"
+
+logging:
+  level: "debug"
+  format: "console" # json, console
+  outputPath: "stdout"
+  maxSize: 100 # MB
+  maxBackups: 3
+  maxAge: 28 # days
+  compress: true

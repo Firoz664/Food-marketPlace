@@ -6,7 +6,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var orderItemCollection *mongo.Collection = database.OpenCollection(database.Client, "orderItem")
+var orderItemCollection *mongo.Collection
+
+// getOrderItemCollection returns the orderItem collection with lazy initialization
+func getOrderItemCollection() *mongo.Collection {
+	if orderItemCollection == nil {
+		client := database.DBInstance()
+		orderItemCollection = database.OpenCollection(client, "orderItem")
+	}
+	return orderItemCollection
+}
 
 // GetInvoice returns a Gin handler function
 func GetOrderItems() gin.HandlerFunc {

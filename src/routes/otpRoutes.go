@@ -7,13 +7,17 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var otpCollection *mongo.Collection = database.OpenCollection(database.Client, "otp")
-
 func OtpRoutes(router *gin.Engine) {
 	otpGroup := router.Group("/api/v1/otp")
 	{
-		otpGroup.POST("/createAndSendOtp", otpController.CreateOTP(otpCollection))
+		otpGroup.POST("/createAndSendOtp", otpController.CreateOTP(getOtpCollection()))
 		otpGroup.POST("/verifyOtp", otpController.VerifyOtp())
 
 	}
+}
+
+// getOtpCollection returns the otp collection with lazy initialization
+func getOtpCollection() *mongo.Collection {
+	client := database.DBInstance()
+	return database.OpenCollection(client, "otp")
 }

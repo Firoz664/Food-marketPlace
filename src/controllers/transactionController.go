@@ -8,7 +8,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var transactionCollection *mongo.Collection = database.OpenCollection(database.Client, "transaction")
+var transactionCollection *mongo.Collection
+
+// getTransactionCollection returns the transaction collection with lazy initialization
+func getTransactionCollection() *mongo.Collection {
+	if transactionCollection == nil {
+		client := database.DBInstance()
+		transactionCollection = database.OpenCollection(client, "transaction")
+	}
+	return transactionCollection
+}
 
 func GetByIdTransaction() gin.HandlerFunc {
 	return func(c *gin.Context) {
