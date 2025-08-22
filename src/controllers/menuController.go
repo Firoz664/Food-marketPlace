@@ -6,7 +6,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var menuCollection *mongo.Collection = database.OpenCollection(database.Client, "menu")
+var menuCollection *mongo.Collection
+
+// getMenuCollection returns the menu collection with lazy initialization
+func getMenuCollection() *mongo.Collection {
+	if menuCollection == nil {
+		client := database.DBInstance()
+		menuCollection = database.OpenCollection(client, "menu")
+	}
+	return menuCollection
+}
 
 // GetInvoice returns a Gin handler function
 func GetMenu() gin.HandlerFunc {

@@ -6,7 +6,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var tableCollection *mongo.Collection = database.OpenCollection(database.Client, "table")
+var tableCollection *mongo.Collection
+
+// getTableCollection returns the table collection with lazy initialization
+func getTableCollection() *mongo.Collection {
+	if tableCollection == nil {
+		client := database.DBInstance()
+		tableCollection = database.OpenCollection(client, "table")
+	}
+	return tableCollection
+}
 
 // GetInvoice returns a Gin handler function
 func GetTables() gin.HandlerFunc {

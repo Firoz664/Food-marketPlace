@@ -19,7 +19,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var otpCollection *mongo.Collection = database.OpenCollection(database.Client, "otp")
+var otpCollection *mongo.Collection
+
+// getOtpCollection returns the otp collection with lazy initialization
+func getOtpCollection() *mongo.Collection {
+	if otpCollection == nil {
+		client := database.DBInstance()
+		otpCollection = database.OpenCollection(client, "otp")
+	}
+	return otpCollection
+}
 var validateOtp = validator.New()
 
 // GetInvoice returns a Gin handler function
@@ -53,7 +62,8 @@ func CreateOTP(otpCollection *mongo.Collection) gin.HandlerFunc {
 		user.ExpiredAt = expirationTime
 
 		// Save OTP to the database
-		result, err := otpCollection.InsertOne(mongoCtx, user)
+		collection := getOtpCollection()
+		result, err := collection.InsertOne(mongoCtx, user)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"status": false,
@@ -127,7 +137,8 @@ func VerifyOtp() gin.HandlerFunc {
 		}
 
 		var foundOTP models.OTP
-		err := otpCollection.FindOne(context.TODO(), searchCriteria).Decode(&foundOTP)
+		collection := getOtpCollection()
+		err := collection.FindOne(context.TODO(), searchCriteria).Decode(&foundOTP)
 		if err != nil {
 			errorMsg := "Invalid User!"
 			if err == mongo.ErrNoDocuments {
@@ -154,7 +165,7 @@ func VerifyOtp() gin.HandlerFunc {
 		if foundOTP.OtpCode == input.OtpCode {
 			// Update IsVerified to true
 			update := bson.M{"$set": bson.M{"isVerify": true}}
-			_, err := otpCollection.UpdateOne(context.TODO(), bson.M{"_id": foundOTP.ID}, update)
+			_, err := collection.UpdateOne(context.TODO(), bson.M{"_id": foundOTP.ID}, update)
 			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{"status": false, "msg": "Failed to update verification status"})
 				return

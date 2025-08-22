@@ -16,7 +16,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var restaurantCollection *mongo.Collection = database.OpenCollection(database.Client, "restaurant")
+var restaurantCollection *mongo.Collection
+
+// getRestaurantCollection returns the restaurant collection with lazy initialization
+func getRestaurantCollection() *mongo.Collection {
+	if restaurantCollection == nil {
+		client := database.DBInstance()
+		restaurantCollection = database.OpenCollection(client, "restaurant")
+	}
+	return restaurantCollection
+}
 var restaurantValidate = validator.New()
 
 func CreateRestaurant() gin.HandlerFunc {

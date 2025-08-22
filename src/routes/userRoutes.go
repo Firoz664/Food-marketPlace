@@ -11,7 +11,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-var userCollection *mongo.Collection = database.OpenCollection(database.Client, "user")
+// getUserCollection returns the user collection with lazy initialization
+func getUserCollection() *mongo.Collection {
+	client := database.DBInstance()
+	return database.OpenCollection(client, "users") // Note: using "users" to match the controller
+}
 
 func UserRoutes(router *gin.Engine) {
 	userGroup := router.Group("/api/v1/users")
@@ -22,10 +26,10 @@ func UserRoutes(router *gin.Engine) {
 		userGroup.POST("/login", userController.Login())
 
 		userGroup.GET("/getAllUsers", userController.GetAllUser())
-		userGroup.GET("/getUserDetails", AuthController.Authentication(), userController.GetUserDetails(userCollection))
-		userGroup.PUT("/updateUserDetails", AuthController.Authentication(), userController.UpdateUserDetails(userCollection))
+		userGroup.GET("/getUserDetails", AuthController.Authentication(), userController.GetUserDetails(getUserCollection()))
+		userGroup.PUT("/updateUserDetails", AuthController.Authentication(), userController.UpdateUserDetails(getUserCollection()))
 
-		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword(userCollection))
+		userGroup.POST("/resetPassword", AuthController.Authentication(), userController.ResetPassword(getUserCollection()))
 		userGroup.POST("/forgetPassword", userController.ForgetPassword())
 
 		userGroup.DELETE("/deleteAccount", AuthController.Authentication(), userController.DeleteAccount())

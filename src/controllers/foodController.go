@@ -11,7 +11,16 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-var foodCollection *mongo.Collection = database.OpenCollection(database.Client, "food")
+var foodCollection *mongo.Collection
+
+// getFoodCollection returns the food collection with lazy initialization
+func getFoodCollection() *mongo.Collection {
+	if foodCollection == nil {
+		client := database.DBInstance()
+		foodCollection = database.OpenCollection(client, "food")
+	}
+	return foodCollection
+}
 
 func CreateFood() gin.HandlerFunc {
 	return func(c *gin.Context) {
